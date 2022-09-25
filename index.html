@@ -1,15 +1,30 @@
+<head>
+
+  <title>Mandelbrot Set</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+</head>
+<body>
+
 <div class="main">
 <div class="canvas-wrap">
   <canvas id="mandelbrot" class="canvas" width="1000" height="1000"></canvas>
   <canvas id="zoomRect" class="canvas" width="1000" height="1000"></canvas>
 </div>
 <div class="status">
-  <p>centerX = <span id="centerX">-2</span></p>
-  <p>centerY = <span id="centerY">-2</span></p>
-  <p>width = <span id="width">4</span></p>
-  <p>height = <span id="height">4</span></p>
-  <p>zoom = <span id="zoom">250</span></p>
-  <p>k = <span id="k">1</span></p>
+  <div>
+    <p>centerX = <span id="centerX">-2</span></p>
+    <p>centerY = <span id="centerY">-2</span></p>
+    <p>width = <span id="width">4</span></p>
+    <p>height = <span id="height">4</span></p>
+    <p>zoom = <span id="zoom">250</span></p>
+    <p>k = <span id="k">1</span></p>
+  </div>
+  <a href="https://twitter.com/share?ref_src=twsrc%5Etfw"
+     class="twitter-share-button"
+     data-show-count="false"
+  >Tweet</a>
+  <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 </div>
 </div>
 <style>
@@ -368,3 +383,4 @@
       zoomRect.fix();
   });
 </script>
+</body>
