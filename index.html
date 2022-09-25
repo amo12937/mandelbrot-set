@@ -4,8 +4,8 @@
   <canvas id="zoomRect" class="canvas" width="1000" height="1000"></canvas>
 </div>
 <div class="status">
-  <p>top = <span id="top">-2</span></p>
-  <p>left = <span id="left">-2</span></p>
+  <p>centerX = <span id="centerX">-2</span></p>
+  <p>centerY = <span id="centerY">-2</span></p>
   <p>width = <span id="width">4</span></p>
   <p>height = <span id="height">4</span></p>
   <p>zoom = <span id="zoom">250</span></p>
@@ -48,6 +48,12 @@
 <script>
   const CANVAS_WIDTH = 1000;
   const CANVAS_HEIGHT = 1000;
+  const getSize = (w, h) => {
+      if (CANVAS_HEIGHT * w < CANVAS_WIDTH * h) {
+          return [w, w * CANVAS_HEIGHT/ CANVAS_WIDTH];
+      }
+      return [h * CANVAS_WIDTH / CANVAS_HEIGHT, h];
+  }
 
   class Point {
       constructor(x, y) {
@@ -55,10 +61,15 @@
           this.y = y;
       }
 
-      toComplex(topLeft, zoom) {
-          return new Complex(this.x, this.y).scalarDiv(zoom).add(topLeft);
+      toComplex(center, zoom) {
+          return new Complex(
+              this.x - CENTER_POINT.x,
+              this.y - CENTER_POINT.y
+          ).scalarDiv(zoom).add(center);
       }
   }
+
+  const CENTER_POINT = new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
 
   class Complex {
       constructor(re, im) {
@@ -159,11 +170,11 @@
   }
 
   class Board {
-      constructor(topLeft, zoom) {
+      constructor(center, zoom) {
           this.zoom = zoom;
           this.width = CANVAS_WIDTH / this.zoom;
           this.height = CANVAS_HEIGHT / this.zoom;
-          this.topLeft = topLeft;
+          this.center = center;
 
           this.particles = [];
           for (let i = 0; i < CANVAS_WIDTH; i++) {
@@ -172,7 +183,7 @@
                   this.particles.push(
                       new Particle(
                           position,
-                          position.toComplex(topLeft, zoom)
+                          position.toComplex(center, zoom)
                       )
                   );
               }
@@ -199,13 +210,13 @@
       }
 
       getNewBoard(zoomRect) {
-          const topLeftPosition = zoomRect.topLeftPosition;
+          const centerPosition = zoomRect.centerPosition;
           const displayWidth = zoomRect.displayWidth;
           const displayHeight = zoomRect.displayHeight;
 
-          const newTopLeft = topLeftPosition.toComplex(this.topLeft, this.zoom);
+          const newCenter = centerPosition.toComplex(this.center, this.zoom);
           const newZoom = this.zoom * Math.max(CANVAS_WIDTH / displayWidth, CANVAS_HEIGHT / displayHeight);
-          return new Board(newTopLeft, newZoom);
+          return new Board(newCenter, newZoom);
       }
   }
 
@@ -230,27 +241,28 @@
       draw(ctx) {
           ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
           ctx.strokeStyle = "#00FF00";
+          const [halfWidth, halfHeight] = getSize(
+              Math.abs(this.startPosition.x - this.endPosition.x),
+              Math.abs(this.startPosition.y - this.endPosition.y)
+          );
           ctx.strokeRect(
-              this.startPosition.x,
-              this.startPosition.y,
-              this.endPosition.x - this.startPosition.x,
-              this.endPosition.y - this.startPosition.y,
+              this.startPosition.x - halfWidth,
+              this.startPosition.y - halfHeight,
+              halfWidth * 2,
+              halfHeight * 2
           );
       }
 
-      get topLeftPosition() {
-          return new Point(
-              Math.min(this.startPosition.x, this.endPosition.x),
-              Math.min(this.startPosition.y, this.endPosition.y)
-          );
+      get centerPosition() {
+          return this.startPosition;
       }
 
       get displayWidth() {
-          return Math.abs(this.startPosition.x - this.endPosition.x);
+          return Math.abs(this.startPosition.x - this.endPosition.x) * 2;
       }
 
       get displayHeight() {
-          return Math.abs(this.startPosition.y - this.endPosition.y);
+          return Math.abs(this.startPosition.y - this.endPosition.y) * 2;
       }
   }
 
@@ -258,12 +270,12 @@
   const canvasForZoomRect = document.getElementById("zoomRect");
   const contextForZoomRect = canvasForZoomRect.getContext("2d");
 
-  let board = new Board(new Complex(-2, -1.5), 334);
+  let board = new Board(new Complex(-0.5, 0), 334);
   let zoomRect = undefined;
 
   const status = {
-      top: document.getElementById("top"),
-      left: document.getElementById("left"),
+      centerX: document.getElementById("centerX"),
+      centerY: document.getElementById("centerY"),
       width: document.getElementById("width"),
       height: document.getElementById("height"),
       zoom: document.getElementById("zoom"),
@@ -271,8 +283,8 @@
   }
 
   const updateStatus = (board) => {
-      status.top.innerText = board.topLeft.im;
-      status.left.innerText = board.topLeft.re;
+      status.centerX.innerText = board.center.im;
+      status.centerY.innerText = board.center.re;
       status.width.innerText = CANVAS_WIDTH / board.zoom;
       status.height.innerText = CANVAS_HEIGHT / board.zoom;
       status.zoom.innerText = board.zoom;
