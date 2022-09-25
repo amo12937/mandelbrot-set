@@ -328,8 +328,8 @@
   }
 
   const updateStatus = (board) => {
-      status.centerX.innerText = board.center.im;
-      status.centerY.innerText = board.center.re;
+      status.centerX.innerText = board.center.re;
+      status.centerY.innerText = board.center.im;
       status.width.innerText = CANVAS_WIDTH / board.zoom;
       status.height.innerText = CANVAS_HEIGHT / board.zoom;
       status.zoom.innerText = board.zoom;
