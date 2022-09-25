@@ -1,0 +1,328 @@
+<div class="main">
+<div class="canvas-wrap">
+  <canvas id="mandelbrot" class="canvas" width="1000" height="1000"></canvas>
+  <canvas id="zoomRect" class="canvas" width="1000" height="1000"></canvas>
+</div>
+<div class="status">
+  <p>top = <span id="top">-2</span></p>
+  <p>left = <span id="left">-2</span></p>
+  <p>width = <span id="width">4</span></p>
+  <p>height = <span id="height">4</span></p>
+  <p>zoom = <span id="zoom">250</span></p>
+  <p>k = <span id="k">1</span></p>
+</div>
+</div>
+<style>
+.main {
+  display: -webkit-flex;
+  display: flex;
+}
+
+.canvas-wrap{
+  width: 1000px;
+  height: 1000px;
+  max-width: 100%;
+  position: relative;
+  padding: 0;
+  box-sizing: content-box;
+}
+
+.canvas_warp:before{
+  content:"";
+  display: block;
+  padding-top: 50%;
+}
+
+.canvas{
+  position: absolute;
+  left:0;
+  top:0;
+  border: 0;
+  max-width:100%;
+  box-sizing: content-box;
+  padding: 0;
+  margin: 0;
+}
+
+</style>
+<script>
+  const CANVAS_WIDTH = 1000;
+  const CANVAS_HEIGHT = 1000;
+
+  class Point {
+      constructor(x, y) {
+          this.x = x;
+          this.y = y;
+      }
+
+      toComplex(topLeft, zoom) {
+          return new Complex(this.x, this.y).scalarDiv(zoom).add(topLeft);
+      }
+  }
+
+  class Complex {
+      constructor(re, im) {
+          this.re = re;
+          this.im = im;
+      }
+
+      abs() {
+          return Math.sqrt(this.re * this.re + this.im * this.im);
+      }
+
+      sub(c) {
+          return new Complex(this.re - c.re, this.im - c.im);
+      }
+
+      add(c) {
+          return new Complex(this.re + c.re, this.im + c.im);
+      }
+
+      scalarMul(r) {
+          return new Complex(
+              this.re * r,
+              this.im * r
+          );
+      }
+
+      scalarDiv(r) {
+          return new Complex(
+              this.re / r,
+              this.im / r
+          );
+      }
+
+      mul(c) {
+          return new Complex(
+              this.re * c.re - this.im * c.im,
+              this.re * c.im + this.im * c.re
+          );
+      }
+
+      square() {
+          return this.mul(this);
+      }
+  }
+
+  const colorProvider = {
+      white: (k) => "white",
+      rgb: (k) => {
+          const r = k % 256;
+          const q = ((k - r) / 256) % 256;
+          return `rgb(${255 - r}, ${255 - q}, 255)`;
+      },
+      hsl: (k) => {
+          const h = (600 - k % 360) % 360;
+          const l = 50 + Math.abs(50 - k % 100)
+          return `hsl(${h}, 100%, ${l}%)`;
+      },
+      random: ((memento) => (k) => {
+          if (!(k in memento)) {
+              const r = Math.floor(Math.random() * 128) + 128;
+              const g = Math.floor(Math.random() * 128) + 128;
+              const b = Math.floor(Math.random() * 128) + 128;
+              memento[k] = `rgb(${r}, ${g}, ${b})`;
+          }
+          return memento[k];
+      })({})
+  }
+
+  class Particle {
+      constructor(position, c) {
+          this.position = position;
+          this.c = c;
+          this.ck = c;
+          this.ckAbs = this.ck.abs();
+          this.prevIsDivergedToInfinity = undefined;
+          this.isDivergedToInfinity = this.ckAbs > 2;
+          this.k = 1;
+      }
+
+      update() {
+          this.prevIsDivergedToInfinity = this.isDivergedToInfinity;
+          if (this.isDivergedToInfinity) {
+              return;
+          }
+
+          this.ck = this.ck.square().add(this.c);
+          this.ckAbs = this.ck.abs();
+          this.isDivergedToInfinity = this.ckAbs > 2;
+          this.k += 1;
+      }
+
+      color() {
+          if (!this.isDivergedToInfinity) {
+              return "black";
+          }
+          return colorProvider.hsl(this.k);
+      }
+  }
+
+  class Board {
+      constructor(topLeft, zoom) {
+          this.zoom = zoom;
+          this.width = CANVAS_WIDTH / this.zoom;
+          this.height = CANVAS_HEIGHT / this.zoom;
+          this.topLeft = topLeft;
+
+          this.particles = [];
+          for (let i = 0; i < CANVAS_WIDTH; i++) {
+              for (let j = 0; j < CANVAS_HEIGHT; j++) {
+                  const position = new Point(i, j);
+                  this.particles.push(
+                      new Particle(
+                          position,
+                          position.toComplex(topLeft, zoom)
+                      )
+                  );
+              }
+          }
+          this.k = 1;
+      }
+
+      draw(ctx) {
+          for (let i = 0; i < this.particles.length; i++) {
+              const p = this.particles[i];
+              if (p.prevIsDivergedToInfinity === p.isDivergedToInfinity) {
+                  continue;
+              }
+              ctx.fillStyle = p.color();
+              ctx.fillRect(p.position.x, p.position.y, 1, 1);
+          }
+      }
+
+      update() {
+          for (let i = 0; i < this.particles.length; i++) {
+              this.particles[i].update();
+          }
+          this.k += 1;
+      }
+
+      getNewBoard(zoomRect) {
+          const topLeftPosition = zoomRect.topLeftPosition;
+          const displayWidth = zoomRect.displayWidth;
+          const displayHeight = zoomRect.displayHeight;
+
+          const newTopLeft = topLeftPosition.toComplex(this.topLeft, this.zoom);
+          const newZoom = this.zoom * Math.max(CANVAS_WIDTH / displayWidth, CANVAS_HEIGHT / displayHeight);
+          return new Board(newTopLeft, newZoom);
+      }
+  }
+
+  class ZoomRect {
+      constructor(startPosition) {
+          this.startPosition = startPosition;
+          this.endPosition = startPosition;
+          this.fixed = false;
+      }
+
+      updateEndPosition(endPosition) {
+          if (this.fixed) {
+              return;
+          }
+          this.endPosition = endPosition;
+      }
+
+      fix() {
+          this.fixed = true;
+      }
+
+      draw(ctx) {
+          ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+          ctx.strokeStyle = "#00FF00";
+          ctx.strokeRect(
+              this.startPosition.x,
+              this.startPosition.y,
+              this.endPosition.x - this.startPosition.x,
+              this.endPosition.y - this.startPosition.y,
+          );
+      }
+
+      get topLeftPosition() {
+          return new Point(
+              Math.min(this.startPosition.x, this.endPosition.x),
+              Math.min(this.startPosition.y, this.endPosition.y)
+          );
+      }
+
+      get displayWidth() {
+          return Math.abs(this.startPosition.x - this.endPosition.x);
+      }
+
+      get displayHeight() {
+          return Math.abs(this.startPosition.y - this.endPosition.y);
+      }
+  }
+
+  const context = document.getElementById("mandelbrot").getContext("2d");
+  const canvasForZoomRect = document.getElementById("zoomRect");
+  const contextForZoomRect = canvasForZoomRect.getContext("2d");
+
+  let board = new Board(new Complex(-2, -1.5), 334);
+  let zoomRect = undefined;
+
+  const status = {
+      top: document.getElementById("top"),
+      left: document.getElementById("left"),
+      width: document.getElementById("width"),
+      height: document.getElementById("height"),
+      zoom: document.getElementById("zoom"),
+      k: document.getElementById("k"),
+  }
+
+  const updateStatus = (board) => {
+      status.top.innerText = board.topLeft.im;
+      status.left.innerText = board.topLeft.re;
+      status.width.innerText = CANVAS_WIDTH / board.zoom;
+      status.height.innerText = CANVAS_HEIGHT / board.zoom;
+      status.zoom.innerText = board.zoom;
+      status.k.innerText = board.k;
+  };
+
+  const update = () => {
+      if (zoomRect != null && zoomRect.fixed) {
+          board = board.getNewBoard(zoomRect);
+          zoomRect = undefined;
+          contextForZoomRect.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
+
+      board.draw(context);
+      if (zoomRect != null) {
+          zoomRect.draw(contextForZoomRect);
+      }
+
+      updateStatus(board);
+
+      board.update();
+      requestAnimationFrame(update);
+  }
+
+  update();
+
+  const getPosition = (e) => new Point(
+      e.clientX - canvasForZoomRect.getBoundingClientRect().left,
+      e.clientY - canvasForZoomRect.getBoundingClientRect().top
+  );
+
+  canvasForZoomRect.addEventListener("mousedown", (e) => {
+      if (zoomRect != null) {
+          return;
+      }
+      zoomRect = new ZoomRect(getPosition(e));
+  });
+
+  canvasForZoomRect.addEventListener("mousemove", (e) => {
+      if (zoomRect == null) {
+          return;
+      }
+      zoomRect.updateEndPosition(getPosition(e));
+  })
+
+  canvasForZoomRect.addEventListener("mouseup", (e) => {
+      if (zoomRect == null) {
+          return;
+      }
+      zoomRect.updateEndPosition(getPosition(e));
+      zoomRect.fix();
+  });
+</script>
