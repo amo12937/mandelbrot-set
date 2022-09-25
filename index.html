@@ -46,6 +46,8 @@
 
 </style>
 <script>
+  const params = new URLSearchParams(location.search);
+
   const CANVAS_WIDTH = 1000;
   const CANVAS_HEIGHT = 1000;
   const getSize = (w, h) => {
@@ -216,6 +218,10 @@
 
           const newCenter = centerPosition.toComplex(this.center, this.zoom);
           const newZoom = this.zoom * Math.max(CANVAS_WIDTH / displayWidth, CANVAS_HEIGHT / displayHeight);
+          params.set("centerX", newCenter.re);
+          params.set("centerY", newCenter.im);
+          params.set("zoom", newZoom);
+          location.search = params;
           return new Board(newCenter, newZoom);
       }
   }
@@ -266,11 +272,18 @@
       }
   }
 
-  const context = document.getElementById("mandelbrot").getContext("2d");
+  const canvas = document.getElementById("mandelbrot")
+  const context = canvas.getContext("2d");
   const canvasForZoomRect = document.getElementById("zoomRect");
   const contextForZoomRect = canvasForZoomRect.getContext("2d");
 
-  let board = new Board(new Complex(-0.5, 0), 334);
+  let board = new Board(
+      new Complex(
+          parseFloat(params.get("centerX")) || -0.5,
+          parseFloat(params.get("centerY")) || -0.5
+      ),
+      parseFloat(params.get("zoom")) || 334
+  );
   let zoomRect = undefined;
 
   const status = {
