@@ -312,7 +312,7 @@
   let board = new Board(
       new Complex(
           parseFloat(params.get("centerX")) || -0.5,
-          parseFloat(params.get("centerY")) || -0.5
+          parseFloat(params.get("centerY")) || 0
       ),
       parseFloat(params.get("zoom")) || 334
   );
