@@ -84,6 +84,10 @@
               this.y - CENTER_POINT.y
           ).scalarDiv(zoom).add(center);
       }
+
+      equals(p) {
+          return this.x == p.x && this.y == p.y;
+      }
   }
 
   const CENTER_POINT = new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
@@ -272,6 +276,20 @@
           this.endPosition = endPosition;
       }
 
+      set endPosition(endPosition) {
+          if (this.startPosition.equals(endPosition)) {
+              this._endPosition = new Point(
+                  this.startPosition.x + CANVAS_WIDTH / 20,
+                  this.startPosition.y + CANVAS_HEIGHT / 20
+              )
+          } else {
+              this._endPosition = endPosition;
+          }
+      }
+      get endPosition() {
+          return this._endPosition;
+      }
+
       fix() {
           this.fixed = true;
       }
@@ -380,6 +398,14 @@
           return;
       }
       zoomRect.updateEndPosition(getPosition(e));
+      zoomRect.fix();
+  });
+
+  canvasForZoomRect.addEventListener("touchend", (e) => {
+      if (zoomRect != null) {
+          return;
+      }
+      zoomRect = new ZoomRect(getPosition(e.changedTouches[0]));
       zoomRect.fix();
   });
 </script>
