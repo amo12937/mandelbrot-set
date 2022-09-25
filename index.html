@@ -117,19 +117,19 @@
       }
   }
 
-  const colorProvider = {
-      white: (k) => "white",
-      rgb: (k) => {
+  const colorProviders = {
+      white: () => () => "white",
+      rgb: () => (k) => {
           const r = k % 256;
           const q = ((k - r) / 256) % 256;
           return `rgb(${255 - r}, ${255 - q}, 255)`;
       },
-      hsl: (k) => {
+      hsl: () => (k) => {
           const h = (600 - k % 360) % 360;
           const l = 50 + Math.abs(50 - k % 100)
           return `hsl(${h}, 100%, ${l}%)`;
       },
-      random: ((memento) => (k) => {
+      random: () => ((memento) => (k) => {
           if (!(k in memento)) {
               const r = Math.floor(Math.random() * 128) + 128;
               const g = Math.floor(Math.random() * 128) + 128;
@@ -137,8 +137,25 @@
               memento[k] = `rgb(${r}, ${g}, ${b})`;
           }
           return memento[k];
-      })({})
+      })({}),
+      monochromaticGradation: (params) => (k) => {
+          const parsed = parseFloat(params);
+          const h = isNaN(parsed) ? 240 : parsed;
+          const l = 50 + Math.abs(50 - k % 100)
+          return `hsl(${h}, 100%, ${l}%)`;
+      },
+      monochromatic: (params) => (k) => {
+          return params;
+      },
   }
+
+  const colorProvider = {
+      name: params.get("colorProvider") || "hsl",
+      params: params.get("paramsOfColorProvider")
+  };
+  colorProvider.getColor = (colorProviders[colorProvider.name] || colorProviders.hsl)(
+      colorProvider.params
+  );
 
   class Particle {
       constructor(position, c) {
@@ -167,7 +184,7 @@
           if (!this.isDivergedToInfinity) {
               return "black";
           }
-          return colorProvider.hsl(this.k);
+          return colorProvider.getColor(this.k);
       }
   }
 
