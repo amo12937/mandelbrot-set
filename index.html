@@ -297,10 +297,7 @@
       draw(ctx) {
           ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
           ctx.strokeStyle = "#00FF00";
-          const [halfWidth, halfHeight] = getSize(
-              Math.abs(this.startPosition.x - this.endPosition.x),
-              Math.abs(this.startPosition.y - this.endPosition.y)
-          );
+          const [halfWidth, halfHeight] = this.halfWidthAndHeight;
           ctx.strokeRect(
               this.startPosition.x - halfWidth,
               this.startPosition.y - halfHeight,
@@ -319,6 +316,22 @@
 
       get displayHeight() {
           return Math.abs(this.startPosition.y - this.endPosition.y) * 2;
+      }
+
+      get halfWidthAndHeight() {
+          return getSize(
+              Math.abs(this.startPosition.x - this.endPosition.x),
+              Math.abs(this.startPosition.y - this.endPosition.y)
+          );
+      }
+
+      isIn(p) {
+          const [halfWidth, halfHeight] = this.halfWidthAndHeight;
+          return
+              this.startPosition.x - halfWidth <= p.x &&
+              p.x < this.startPosition.x + halfWidth &&
+              this.startPosition.y - halfHeight <= p.y &&
+              p.y < this.startPosition.y + halfHeight;
       }
   }
 
@@ -355,10 +368,10 @@
   };
 
   const update = () => {
+      contextForZoomRect.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       if (zoomRect != null && zoomRect.fixed) {
           board = board.getNewBoard(zoomRect);
           zoomRect = undefined;
-          contextForZoomRect.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       }
 
       board.draw(context);
@@ -401,12 +414,39 @@
       zoomRect.fix();
   });
 
-  canvasForZoomRect.addEventListener("touchend", (e) => {
-      if (zoomRect != null) {
+  let clicked = false;
+  canvasForZoomRect.addEventListener("touchstart", (e) => {
+      const touchedPosition = getPosition(e.changedTouches[0]);
+      if (zoomRect == null) {
+          zoomRect = new ZoomRect(touchedPosition);
+          clicked = false;
           return;
       }
-      zoomRect = new ZoomRect(getPosition(e.changedTouches[0]));
-      zoomRect.fix();
+      clicked = zoomRect.isIn(touchedPosition);
+  });
+
+  canvasForZoomRect.addEventListener("touchmove", (e) => {
+      if (zoomRect == null) {
+          return;
+      }
+      const touchedPosition = getPosition(e.changedTouches[0]);
+      zoomRect.startPosition = touchedPosition;
+      zoomRect.endPosition = touchedPosition;
+      clicked = false;
+  });
+
+  canvasForZoomRect.addEventListener("touchend", (e) => {
+      if (zoomRect == null) {
+          return;
+      }
+      if (clicked) {
+          zoomRect.fix();
+          clicked = false;
+      }
+  });
+  canvasForZoomRect.addEventListener("touchcancel", (e) => {
+      zoomRect = null;
+      clicked = false;
   });
 </script>
 </body>
