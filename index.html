@@ -13,7 +13,7 @@
 </div>
 <div class="status">
   <div>
-    <p>version 0.1.6</p>
+    <p>version 0.1.7</p>
     <p>centerX = <span id="centerX">-2</span></p>
     <p>centerY = <span id="centerY">-2</span></p>
     <p>width = <span id="width">4</span></p>
@@ -424,7 +424,7 @@
           clicked = false;
           return;
       }
-      clicked = zoomRect.isIn(touchedPosition);
+      clicked = true;
   });
 
   canvasForZoomRect.addEventListener("touchmove", (e) => {
@@ -435,7 +435,6 @@
       const touchedPosition = getPosition(e.changedTouches[0]);
       zoomRect.startPosition = touchedPosition;
       zoomRect.endPosition = touchedPosition;
-      clicked = false;
   });
 
   canvasForZoomRect.addEventListener("touchend", (e) => {
@@ -447,11 +446,6 @@
           zoomRect.fix();
           clicked = false;
       }
-  });
-  canvasForZoomRect.addEventListener("touchcancel", (e) => {
-      e.preventDefault();
-      zoomRect = null;
-      clicked = false;
   });
 </script>
 </body>
