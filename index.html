@@ -416,6 +416,7 @@
 
   let clicked = false;
   canvasForZoomRect.addEventListener("touchstart", (e) => {
+      e.preventDefault();
       const touchedPosition = getPosition(e.changedTouches[0]);
       if (zoomRect == null) {
           zoomRect = new ZoomRect(touchedPosition);
@@ -426,6 +427,7 @@
   });
 
   canvasForZoomRect.addEventListener("touchmove", (e) => {
+      e.preventDefault();
       if (zoomRect == null) {
           return;
       }
@@ -436,6 +438,7 @@
   });
 
   canvasForZoomRect.addEventListener("touchend", (e) => {
+      e.preventDefault();
       if (zoomRect == null) {
           return;
       }
@@ -445,6 +448,7 @@
       }
   });
   canvasForZoomRect.addEventListener("touchcancel", (e) => {
+      e.preventDefault();
       zoomRect = null;
       clicked = false;
   });
