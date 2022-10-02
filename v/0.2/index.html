@@ -12,7 +12,7 @@
     <canvas id="controller" class="canvas"></canvas>
   </div>
   <div class="status">
-    <p>version 0.2.0</p>
+    <p>version 0.2.1</p>
     <p>
       <a href="https://twitter.com/share?ref_src=twsrc%5Etfw"
          class="twitter-share-button"
@@ -22,6 +22,7 @@
     </p>
     <p>k = <span id="status-k">1</span></p>
     <p>number of perticles = <span id="status-particles-length"></span></p>
+    <p>fps = <span id="status-fps"></span></p>
     <p><button id="status-pause">pause</button></p>
     <p><button id="status-zoom-in">zoom in</button></p>
     <p><button id="status-zoom-out">zoom out</button></p>
@@ -105,19 +106,30 @@ body {
       $height: document.getElementById("status-height"),
       $zoom: document.getElementById("status-zoom"),
       $particlesLength: document.getElementById("status-particles-length"),
+      $fps: document.getElementById("status-fps"),
       pause: {
         $button: document.getElementById("status-pause"),
         paused: false
       },
       $zoomIn: document.getElementById("status-zoom-in"),
       $zoomOut: document.getElementById("status-zoom-out"),
-      draw: (board) => {
-          statuses.$k.innerText = board.k;
-          statuses.$particlesLength.innerText = board.particles.length;
-          const cursorComplex = board.cursorComplex;
-          statuses.$cursorX.innerText = cursorComplex.re;
-          statuses.$cursorY.innerText = cursorComplex.im;
-      },
+      draw: (() => {
+          let t0 = performance.now();
+          let t1 = t0;
+          return (board) => {
+              statuses.$k.innerText = board.k;
+              statuses.$particlesLength.innerText = board.particles.length;
+              const t = performance.now();
+              if (t - t1 >= 2000) {
+                  statuses.$fps.innerText = Math.floor(10000 / (t - t0)) / 10;
+                  t1 = t;
+              }
+              t0 = t;
+              const cursorComplex = board.cursorComplex;
+              statuses.$cursorX.innerText = cursorComplex.re;
+              statuses.$cursorY.innerText = cursorComplex.im;
+          }
+      })(),
       drawInitialStatuses: (board) => {
           statuses.$centerX.innerText = board.centerComplex.re;
           statuses.$centerY.innerText = board.centerComplex.im;
@@ -391,7 +403,6 @@ body {
           params.set("centerX", center.re);
           params.set("centerY", center.im);
           params.set("width", this.width / magnification);
-          console.log(params);
           location.search = params;
 
           return new Board(
@@ -421,8 +432,12 @@ body {
 
   statuses.drawInitialStatuses(board);
   const update = () => {
+      const t = performance.now();
       board.draw(canvas.mandelbrot.context, canvas.controller.context);
       board.update();
+      while (performance.now() - t < 32) {
+          board.update();
+      }
       statuses.draw(board);
 
       if (!statuses.pause.paused) {
