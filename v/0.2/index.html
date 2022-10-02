@@ -1,0 +1,518 @@
+<head>
+
+  <title>Mandelbrot Set</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+</head>
+<body>
+
+<div class="main">
+  <div class="canvas-wrap">
+    <canvas id="mandelbrot" class="canvas"></canvas>
+    <canvas id="controller" class="canvas"></canvas>
+  </div>
+  <div class="status">
+    <p>version 0.2.0</p>
+    <p>
+      <a href="https://twitter.com/share?ref_src=twsrc%5Etfw"
+         class="twitter-share-button"
+         data-show-count="false"
+      >Tweet</a>
+      <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+    </p>
+    <p>k = <span id="status-k">1</span></p>
+    <p>number of perticles = <span id="status-particles-length"></span></p>
+    <p><button id="status-pause">pause</button></p>
+    <p><button id="status-zoom-in">zoom in</button></p>
+    <p><button id="status-zoom-out">zoom out</button></p>
+
+    <p>cursorX = <span id="status-cursor-x">-0.75</span></p>
+    <p>cursorY = <span id="status-cursor-y">0</span></p>
+    <p>centerX = <span id="status-center-x">-0.75</span></p>
+    <p>centerY = <span id="status-center-y">0</span></p>
+    <p>width = <span id="status-width">2.5</span></p>
+    <p>height = <span id="status-height">2.5</span></p>
+    <p>zoom = <span id="status-zoom"></span></p>
+  </div>
+</div>
+
+<style>
+body {
+  margin: 0;
+  padding: 0;
+}
+
+
+@media screen and (orientation: landscape) {
+  .main {
+    display: -webkit-flex;
+    display: flex;
+  }
+}
+
+.canvas-wrap {
+  width: 100vmin;
+  height: 100vmin;
+  position: relative;
+  padding: 0;
+  margin: 0;
+  box-sizing: content-box;
+}
+
+.canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  box-sizing: content-box;
+  padding: 0;
+  margin: 0;
+}
+
+</style>
+
+<script>
+  const canvas = (() => {
+      const self = {
+          mandelbrot: {
+              $canvas: document.getElementById("mandelbrot")
+          },
+          controller: {
+              $canvas: document.getElementById("controller")
+          }
+      };
+      self.mandelbrot.context = self.mandelbrot.$canvas.getContext("2d");
+      self.controller.context = self.controller.$canvas.getContext("2d");
+      self.boundingClientRect = self.mandelbrot.$canvas.getBoundingClientRect();
+      self.mandelbrot.$canvas.width = self.boundingClientRect.width;
+      self.mandelbrot.$canvas.height = self.boundingClientRect.height;
+      self.controller.$canvas.width = self.boundingClientRect.width;
+      self.controller.$canvas.height = self.boundingClientRect.height;
+      return self;
+  })();
+
+  const params = new URLSearchParams(location.search);
+  const statuses = {
+      $k: document.getElementById("status-k"),
+      $cursorX: document.getElementById("status-cursor-x"),
+      $cursorY: document.getElementById("status-cursor-y"),
+      $centerX: document.getElementById("status-center-x"),
+      $centerY: document.getElementById("status-center-y"),
+      $width: document.getElementById("status-width"),
+      $height: document.getElementById("status-height"),
+      $zoom: document.getElementById("status-zoom"),
+      $particlesLength: document.getElementById("status-particles-length"),
+      pause: {
+        $button: document.getElementById("status-pause"),
+        paused: false
+      },
+      $zoomIn: document.getElementById("status-zoom-in"),
+      $zoomOut: document.getElementById("status-zoom-out"),
+      draw: (board) => {
+          statuses.$k.innerText = board.k;
+          statuses.$particlesLength.innerText = board.particles.length;
+          const cursorComplex = board.cursorComplex;
+          statuses.$cursorX.innerText = cursorComplex.re;
+          statuses.$cursorY.innerText = cursorComplex.im;
+      },
+      drawInitialStatuses: (board) => {
+          statuses.$centerX.innerText = board.centerComplex.re;
+          statuses.$centerY.innerText = board.centerComplex.im;
+          statuses.$width.innerText = board.width;
+          statuses.$height.innerText = board.height;
+          statuses.$zoom.innerText = board.zoom;
+      }
+  }
+
+  class Point {
+      constructor(x, y) {
+          this.x = x;
+          this.y = y;
+      }
+
+      toComplex() {
+          return new Complex(this.x, this.y);
+      }
+
+      add(p) {
+          return new Point(this.x + p.x, this.y + p.y);
+      }
+
+      sub(p) {
+          return new Point(this.x - p.x, this.y - p.y);
+      }
+
+      equals(p) {
+          return this.x == p.x && this.y == p.y;
+      }
+  }
+
+  class Complex {
+      constructor(re, im) {
+          this.re = re;
+          this.im = im;
+      }
+
+      toPoint() {
+          return new Point(this.re, this.im);
+      }
+
+      add(c) {
+          return new Complex(this.re + c.re, this.im + c.im);
+      }
+
+      sub(c) {
+          return new Complex(this.re - c.re, this.im - c.im);
+      }
+
+      absSquare() {
+          return this.re * this.re + this.im * this.im;
+      }
+
+      scalarMul(r) {
+          return new Complex(
+              this.re * r,
+              this.im * r
+          );
+      }
+
+      scalarDiv(r) {
+          return new Complex(
+              this.re / r,
+              this.im / r
+          );
+      }
+
+      square() {
+          return new Complex(
+              this.re * this.re - this.im * this.im,
+              2 * this.re * this.im
+          );
+      }
+  }
+
+  const colorProviderDecorator = ([key, ...otherParams], decorator) => {
+      const getColor = memento((colorProviders[key] || colorProviders.hsl)(otherParams));
+      return (k) => getColor(decorator(k));
+  }
+
+  const memento = (f) => ((m) => (k) => {
+      if (!(k in m)) {
+          m[k] = f(k);
+      }
+      return m[k];
+  })({});
+
+  const colorProviders = {
+      white: () => () => "white",
+      rgb: () => (k) => {
+          const r = k % 256;
+          const q = ((k - r) / 256) % 256;
+          return `rgb(${255 - r}, ${255 - q}, 255)`;
+      },
+      hsl: () => (k) => {
+          const h = (600 - k % 360) % 360;
+          const l = 50 + Math.abs(50 - k % 100)
+          return `hsl(${h}, 100%, ${l}%)`;
+      },
+      logScale: (params) => colorProviderDecorator(params, (k) => Math.floor(10 * Math.log(k))),
+      squareRoot: (params) => colorProviderDecorator(params, (k) => Math.floor(10 * Math.sqrt(k))),
+      random: () => (k) => {
+          const r = Math.floor(Math.random() * 128) + 128;
+          const g = Math.floor(Math.random() * 128) + 128;
+          const b = Math.floor(Math.random() * 128) + 128;
+          return `rgb(${r}, ${g}, ${b})`;
+      },
+      monochromaticGradation: ([hueString]) => (k) => {
+          const parsedHue = parseFloat(hueString);
+          const h = isNaN(parsedHue) ? 240 : parsedHue;
+          const l = 50 + Math.abs(50 - k % 100)
+          return `hsl(${h}, 100%, ${l}%)`;
+      },
+      monochromatic: ([colorName]) => (k) => {
+          return colorName;
+      },
+  }
+
+  const colorProvider = {
+      name: params.get("colorProvider") || "hsl",
+      params: params.getAll("paramsOfColorProvider")
+  };
+  colorProvider.getColor = memento((colorProviders[colorProvider.name] || colorProviders.hsl)(
+      colorProvider.params
+  ));
+
+  class Particle {
+      constructor(p, c, colorProvider) {
+          this.p = p;
+          this.c = c;
+          this.ck = c;
+          this.k = undefined;
+          this.colorProvider = colorProvider;
+          this.color = "black";
+      }
+
+      update(k) {
+          if (this.k != null) {
+              return;
+          }
+          this.ck = this.ck.square().add(this.c);
+          if (this.ck.absSquare() > 4) {
+              this.k = k;
+              this.color = this.colorProvider.getColor(this.k);
+          }
+      }
+  }
+
+  class Cursor {
+      constructor(p, boundingClientRect, magnification) {
+          this.boundingClientRect = boundingClientRect;
+          this.displayWidth = boundingClientRect.width / magnification;
+          this.displayHeight = boundingClientRect.width / magnification;
+
+          this.p = p;
+
+          this.strokeColorStatus = 0;
+      }
+
+      set p(newP) {
+          this._p = newP;
+          if (newP == null) {
+              return;
+          }
+          this.left = newP.x - this.displayWidth / 2;
+          this.top = newP.y - this.displayHeight / 2;
+      }
+
+      get p() {
+          return this._p;
+      }
+
+      get strokeColor() {
+          this.strokeColorStatus = (this.strokeColorStatus + 1) % 4;
+          if (this.strokeColorStatus == 0) {
+              return "black";
+          } else if (this.strokeColorStatus == 2) {
+              return "white"
+          }
+          return "gray";
+      }
+
+      draw(ctx) {
+          ctx.clearRect(0, 0, this.boundingClientRect.width, this.boundingClientRect.height);
+          if (this._p == null) {
+              return;
+          }
+
+          ctx.strokeStyle = this.strokeColor;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(
+              this.left,
+              this.top,
+              this.displayWidth,
+              this.displayHeight,
+          )
+      }
+  }
+
+  class Board {
+      constructor(center, width, boundingClientRect, colorProvider) {
+          this.centerComplex = center;
+          this.width = width;
+          this.centerPoint = new Point(boundingClientRect.width / 2, boundingClientRect.height / 2);
+          this.zoom = boundingClientRect.width / width;
+          this.height = boundingClientRect.height / this.zoom;
+
+          this.boundingClientRect = boundingClientRect;
+          this.colorProvider = colorProvider;
+
+          this.particles = [];
+          for (let i = 0; i < boundingClientRect.width; i++) {
+              for (let j = 0; j < boundingClientRect.height; j++) {
+                  const p = new Point(i, j);
+                  this.particles.push(
+                      new Particle(
+                          p,
+                          this.convertPointToComplex(p),
+                          colorProvider
+                      )
+                  );
+              }
+          }
+          this.k = 0;
+          this.cursor = new Cursor(undefined, boundingClientRect, 10);
+      }
+
+      convertPointToComplex(p) {
+          return p.sub(this.centerPoint)
+            .toComplex()
+            .scalarDiv(this.zoom)
+            .add(this.centerComplex);
+      }
+
+      update() {
+          this.k += 1;
+          this.particles.map((p) => p.update(this.k));
+      }
+
+      draw(ctxForParticles, ctxForCursor) {
+          this.drawParticles(ctxForParticles);
+          this.cursor.draw(ctxForCursor);
+      }
+
+      drawParticles(ctx) {
+          this.particles = this.particles.filter((particle) => {
+              if (particle.k == null) {
+                  return true;
+              }
+              ctx.fillStyle = particle.color;
+              ctx.fillRect(particle.p.x, particle.p.y, 1, 1);
+              return false;
+          });
+      }
+
+      set cursorPoint(p) {
+          this.cursor.p = p;
+      }
+
+      get cursorPoint() {
+          return this.cursor.p || this.centerPoint;
+      }
+
+      get cursorComplex() {
+          return this.convertPointToComplex(this.cursorPoint);
+      }
+
+      createNewBoard(magnification) {
+          const center = this.cursorComplex;
+          params.set("centerX", center.re);
+          params.set("centerY", center.im);
+          params.set("width", this.width / magnification);
+          console.log(params);
+          location.search = params;
+
+          return new Board(
+              this.cursorComplex,
+              this.width / magnification,
+              this.boundingClientRect,
+              this.colorProvider
+          );
+      }
+  }
+
+  let board = new Board(
+      new Complex(
+          parseFloat(params.get("centerX")) || -0.75,
+          parseFloat(params.get("centerY")) || 0
+      ),
+      parseFloat(params.get("width")) || 2.5,
+      canvas.boundingClientRect,
+      colorProvider
+  );
+
+  const reset = () => {
+      canvas.mandelbrot.context.fillStyle = "black";
+      canvas.mandelbrot.context.fillRect(0, 0, canvas.boundingClientRect.width, canvas.boundingClientRect.height);
+  }
+  reset();
+
+  statuses.drawInitialStatuses(board);
+  const update = () => {
+      board.draw(canvas.mandelbrot.context, canvas.controller.context);
+      board.update();
+      statuses.draw(board);
+
+      if (!statuses.pause.paused) {
+          requestAnimationFrame(update);
+      }
+  }
+
+  update();
+
+  (() => {
+      const getPosition = (e) => {
+          return new Point(
+              e.clientX - canvas.boundingClientRect.left,
+              e.clientY - canvas.boundingClientRect.top,
+          );
+      }
+
+      const startPosition = {
+          cursor: undefined,
+          touch: undefined,
+      };
+      const down = (e) => {
+          startPosition.cursor = board.cursorPoint;
+          startPosition.touch = getPosition(e);
+      }
+      const move = (e) => {
+          if (startPosition.touch == null) {
+              return;
+          }
+          const p = getPosition(e);
+          board.cursorPoint = startPosition.cursor.add(p).sub(startPosition.touch);
+      }
+      const up = (e) => {
+          const p = getPosition(e);
+          if (startPosition.touch == null || startPosition.touch.equals(p)) {
+              board.cursorPoint = p;
+          }
+          startPosition.cursor = undefined;
+          startPosition.touch = undefined;
+      }
+
+      canvas.controller.$canvas.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          down(e);
+      });
+      canvas.controller.$canvas.addEventListener("mousemove", (e) => {
+          e.preventDefault();
+          move(e);
+      });
+      canvas.controller.$canvas.addEventListener("mouseup", (e) => {
+          e.preventDefault();
+          up(e);
+      });
+
+      canvas.controller.$canvas.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          down(e.changedTouches[0]);
+      });
+      canvas.controller.$canvas.addEventListener("touchmove", (e) => {
+          e.preventDefault();
+          move(e.changedTouches[0]);
+      });
+      canvas.controller.$canvas.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          up(e.changedTouches[0]);
+      });
+
+
+      statuses.pause.$button.addEventListener("click", () => {
+          if (statuses.pause.paused) {
+              statuses.pause.$button.innerText = "pause";
+              statuses.pause.paused = false;
+              update();
+          } else {
+              statuses.pause.$button.innerText = "resume";
+              statuses.pause.paused = true;
+          }
+      })
+
+      statuses.$zoomIn.addEventListener("click", () => {
+          board = board.createNewBoard(10);
+          reset();
+      });
+
+      statuses.$zoomOut.addEventListener("click", () => {
+          board = board.createNewBoard(0.1);
+          reset();
+      });
+  })();
+
+</script>
+
+</body>
