@@ -76,6 +76,107 @@ body {
 </style>
 
 <script>
+  const math = (() => {
+      const self = {};
+      self.gcd = (m, n) => {
+          if (m < 0) {
+              return self.gcd(-m, n);
+          }
+          if (n < 0) {
+              return self.gcd(m, -n);
+          }
+
+          if (n == 0) {
+              return m == 0 ? 1 : m;
+          }
+
+          if (m == 0) {
+              return n;
+          }
+
+          return self.gcd(n, m % n);
+      }
+
+      class Quotient {
+          constructor(numerator, denominator) {
+              this.numerator = numerator;
+              this.denominator = denominator;
+          }
+
+          add(q) {
+              return self.Quotient.new(
+                  this.numerator * q.denominator + this.denominator * q.numerator,
+                  this.denominator * q.denominator
+              );
+          }
+
+          sub(q) {
+              return self.Quotient.new(
+                  this.numerator * q.denominator - this.denominator * q.numerator,
+                  this.denominator * q.denominator
+              );
+          }
+
+          mul(q) {
+              return self.Quotient.new(
+                  this.numerator * q.numerator,
+                  this.denominator * q.denominator
+              );
+          }
+
+          div(q) {
+              return self.Quotient.new(
+                  this.numerator * q.denominator,
+                  this.denominator * q.numerator
+              );
+          }
+
+          toString() {
+              return `${this.numerator}/${this.denominator}`;
+          }
+
+          gt(n) {
+              return this.numerator > this.denominator * BigInt(n);
+          }
+      }
+
+      self.Quotient = {
+          new: (numerator, denominator) => {
+              if (denominator == null) {
+                  return self.Quotient.new(numerator, 1n);
+              }
+              if (denominator == 0) {
+                  throw new Error("divide by 0");
+              }
+              if (numerator == 0) {
+                  return new Quotient(0n, 1n);
+              }
+              if (denominator < 0) {
+                  return self.Quotient.new(-numerator, -denominator);
+              }
+
+              const n = BigInt(numerator);
+              const d = BigInt(denominator);
+              const g = self.gcd(n, d);
+              return new Quotient(n / g, d / g);
+          },
+
+          parse: (s, d) => {
+              if (s == null) {
+                  return d;
+              }
+              const [numerator, denominator] = s.split("/");
+              return self.Quotient.new(
+                  BigInt(numerator),
+                  denominator == null ? 1n : BigInt(denominator)
+              );
+          }
+      }
+
+      return self;
+  })();
+
+
   const canvas = (() => {
       const self = {
           mandelbrot: {
@@ -146,7 +247,10 @@ body {
       }
 
       toComplex() {
-          return new Complex(this.x, this.y);
+          return new Complex(
+              math.Quotient.new(this.x),
+              math.Quotient.new(this.y)
+          );
       }
 
       add(p) {
@@ -168,40 +272,36 @@ body {
           this.im = im;
       }
 
-      toPoint() {
-          return new Point(this.re, this.im);
-      }
-
       add(c) {
-          return new Complex(this.re + c.re, this.im + c.im);
+          return new Complex(this.re.add(c.re), this.im.add(c.im));
       }
 
       sub(c) {
-          return new Complex(this.re - c.re, this.im - c.im);
+          return new Complex(this.re.sub(c.re), this.im.sub(c.im));
       }
 
       absSquare() {
-          return this.re * this.re + this.im * this.im;
+          return this.re.mul(this.re).add(this.im.mul(this.im));
       }
 
       scalarMul(r) {
           return new Complex(
-              this.re * r,
-              this.im * r
+              this.re.mul(r),
+              this.im.mul(r)
           );
       }
 
       scalarDiv(r) {
           return new Complex(
-              this.re / r,
-              this.im / r
+              this.re.div(r),
+              this.im.div(r)
           );
       }
 
       square() {
           return new Complex(
-              this.re * this.re - this.im * this.im,
-              2 * this.re * this.im
+              this.re.mul(this.re).sub(this.im.mul(this.im)),
+              this.re.mul(this.im).mul(math.Quotient.new(2n))
           );
       }
   }
@@ -272,7 +372,7 @@ body {
               return;
           }
           this.ck = this.ck.square().add(this.c);
-          if (this.ck.absSquare() > 4) {
+          if (this.ck.absSquare().gt(4)) {
               this.k = k;
               this.color = this.colorProvider.getColor(this.k);
           }
@@ -334,9 +434,9 @@ body {
       constructor(center, width, boundingClientRect, colorProvider) {
           this.centerComplex = center;
           this.width = width;
-          this.centerPoint = new Point(boundingClientRect.width / 2, boundingClientRect.height / 2);
-          this.zoom = boundingClientRect.width / width;
-          this.height = boundingClientRect.height / this.zoom;
+          this.centerPoint = new Point(Math.floor(boundingClientRect.width / 2), Math.floor(boundingClientRect.height / 2));
+          this.zoom = math.Quotient.new(boundingClientRect.width).div(width);
+          this.height = math.Quotient.new(boundingClientRect.height).div(this.zoom);
 
           this.boundingClientRect = boundingClientRect;
           this.colorProvider = colorProvider;
@@ -416,10 +516,10 @@ body {
 
   let board = new Board(
       new Complex(
-          parseFloat(params.get("centerX")) || -0.75,
-          parseFloat(params.get("centerY")) || 0
+          math.Quotient.parse(params.get("centerX"), math.Quotient.new(-3n, 4n)), // default = -3/4 = -0.75
+          math.Quotient.parse(params.get("centerY"), math.Quotient.new(0n, 1n))   // default = 0/1 = 0
       ),
-      parseFloat(params.get("width")) || 2.5,
+      math.Quotient.parse(params.get("width"), math.Quotient.new(5n, 2n)),        // default = 5/2 = 2.5
       canvas.boundingClientRect,
       colorProvider
   );
